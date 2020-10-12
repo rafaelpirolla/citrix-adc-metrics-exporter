@@ -62,10 +62,10 @@ def main():
     metrics_json = get_metrics_file_data(args.metrics_file, args.metric)
 
     # Get protocol type to access ADC
-    ns_protocol = get_ns_session_protocol(args) 
+    ns_protocol = get_ns_session_protocol(args)
 
-    # Get cert validation args provided 
-    ns_cert = get_cert_validation_args(args, ns_protocol) 
+    # Get cert validation args provided
+    ns_cert = get_cert_validation_args(args, ns_protocol)
 
     requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
     requests.packages.urllib3.disable_warnings(SubjectAltNameWarning)
@@ -84,7 +84,7 @@ def main():
 
     try:
         REGISTRY.register(CitrixAdcCollector(nsip=args.target_nsip, metrics=metrics_json, username=ns_user,
-                                             password=ns_password, protocol=ns_protocol, 
+                                             password=ns_password, protocol=ns_protocol,
                                              k8s_cic_prefix=args.k8sCICprefix, ns_cert=ns_cert,
                                              ns_session=ns_session))
     except Exception as e:
@@ -110,7 +110,7 @@ class TimeoutHTTPAdapter(HTTPAdapter):
         if timeout is None:
             kwargs["timeout"] = self.timeout
         return super().get(request, **kwargs)
-    
+
     def post(self, request, **kwargs):
         timeout = kwargs.get("timeout")
         if timeout is None:
@@ -247,7 +247,7 @@ def get_login_credentials(args):
     if deployment_mode.lower() == 'sidecar':
         logger.info('ADC is running as sidecar')
     else:
-        logger.info('ADC is running as standalone')   
+        logger.info('ADC is running as standalone')
 
     if os.environ.get('KUBERNETES_SERVICE_HOST') is not None:
         if os.path.isfile(NS_USERNAME_FILE):
@@ -256,7 +256,7 @@ def get_login_credentials(args):
                     ns_user = f.read().rstrip()
             except Exception as e:
                 logger.error('Error while reading secret. Verify if secret is property mounted::%s', e)
-                
+
         if os.path.isfile(NS_PASSWORD_FILE):
             try:
                 with open(NS_PASSWORD_FILE, 'r') as f:
@@ -267,14 +267,14 @@ def get_login_credentials(args):
         if ns_user is None and ns_password is None:
             if deployment_mode.lower() == DEPLOYMENT_WITH_CPX:
                 ns_user, ns_password = get_cpx_credentials(ns_user, ns_password)
-         
+
     else:
         if hasattr(args, 'username'):
             ns_user = args.username
 
         if hasattr(args, 'password'):
             ns_password = args.password
-         
+
     return ns_user, ns_password
 
 
@@ -289,7 +289,7 @@ def get_ns_session_protocol(args):
 
 
 def get_ns_cert_path(args):
-    'Get ns cert path if protocol is secure option is set' 
+    'Get ns cert path if protocol is secure option is set'
     if args.cacert_path:
         ns_cacert_path = args.cacert_path
     else:
@@ -302,7 +302,7 @@ def get_ns_cert_path(args):
     if not os.path.isfile(ns_cacert_path):
         logger.error('EXITING: ADC Cert validation enabled but CA cert does not exist {}'.format(ns_cacert_path))
         sys.exit()
-         
+
     logger.info('CA certificate path found for validation')
     return ns_cacert_path
 
@@ -327,7 +327,7 @@ def get_cert_validation_args(args, ns_protocol):
 class CitrixAdcCollector(object):
     ''' Add/Update labels for metrics using prometheus apis.'''
 
-    def __init__(self, nsip, metrics, username, password, protocol, 
+    def __init__(self, nsip, metrics, username, password, protocol,
                  k8s_cic_prefix, ns_cert, ns_session):
         self.nsip = nsip
         self.metrics = metrics
@@ -338,7 +338,7 @@ class CitrixAdcCollector(object):
         self.ns_cert = ns_cert
         self.ns_session = ns_session
         self.current_session = False
-        
+
     # Collect metrics from Citrix ADC
     def collect(self):
         nsip = self.nsip
@@ -519,7 +519,7 @@ class CitrixAdcCollector(object):
                 return data
         except requests.exceptions.RequestException as err:
             logger.error('Stat Access Error {}'.format(err))
-        except Exception as e: 
+        except Exception as e:
             logger.error("Unable to access stats from ADC {}".format(e))
 
 
@@ -565,17 +565,17 @@ class CitrixAdcCollector(object):
         url = '%s://%s/nitro/v1/config/login' % (self.protocol, self.nsip)
         try:
             response = self.ns_session.post(url, json=payload, verify=self.ns_cert)
-            data = response.json() 
+            data = response.json()
             if data['errorcode'] == 0 :
                 logger.info("ADC Session Login Successful")
             else:
-                logger.error("ADC Session Login Failed")
-                raise SystemExit('citrix exporter exit when it cannot authenticate: ', e)
+                #logger.error("ADC Session Login Failed")
+                raise SystemExit('ADC Login Failed - exiting')
         except requests.exceptions.RequestException as err:
-            logger.error('Session Login Error {}'.format(err))
+            #logger.error('Session Login Error {}'.format(err))
             raise SystemExit('citrix exporter exit when it cannot authenticate: ', err)
         except Exception as e:
-            logger.error("Login Session Try Failed{}".format(e))
+            #logger.error("Login Session Try Failed{}".format(e))
             raise SystemExit('citrix exporter exit when it cannot authenticate: ', e)
 
     def ns_session_logout(self):
